@@ -1,4 +1,6 @@
 library(shiny)
+library(highcharter)
+
 Mu_t_hat <- function(mu0, tau_mu, tau_d, tau_y, n, yt, st)
 {
   kt = rep(0, n); mut.hat = rep(0, n); var.hat = rep(0, n)
@@ -51,15 +53,15 @@ shinyServer(function(input, output) {
   
   output$distPlot <- highcharter::renderHighchart({ 
     
-    hc <- highchart() %>% 
-      hc_xAxis(1:length(yt)) %>% 
-      hc_add_series(name = "Y_t", data = generate2(), type = "scatter") %>% 
-      hc_add_series(name = "mu_t", data = mut()) %>% 
-      hc_add_series(name = "mu_t_hat",
-                    data = Mu_Plot()) %>%
-      hc_tooltip(crosshairs = TRUE, backgroundColor = "#FCFFC5",
-                 shared = TRUE, borderWidth = 5) %>% 
-      hc_exporting(enabled = TRUE)
+    hc <- highcharter::highchart() %>% 
+      highcharter::hc_xAxis(1:length(yt)) %>%  
+      highcharter::hc_add_series(name = "Y_t", data = generate2(), type = "scatter") %>%
+      highcharter::hc_add_series(name = "mu_t", data = mut(), marker = list(enabled = F)) %>% 
+      highcharter::hc_add_series(name = "mu_t_hat", data = Mu_Plot(), marker = list(enabled = F)) %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, shared = TRUE, borderWidth = 5) %>% 
+      highcharter::hc_exporting(enabled = TRUE)
+    
+    hc
     # 
     # plot(1:length(generate2()), mut(), type="l", ylim = range(c(generate2(), mut(), Mu_Plot())), xlab="tempo", ylab="")
     # points(1:length(generate2()), generate2(), col="red")
