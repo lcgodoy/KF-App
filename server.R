@@ -1,43 +1,70 @@
 library(shiny)
+Mu_t_hat <- function(mu0, tau_mu, tau_d, tau_y, n, yt, st)
+{
+  kt = rep(0, n); mut.hat = rep(0, n); var.hat = rep(0, n)
+  
+  # primeira iteracao
+  kt[1] <- (tau_mu + 1/tau_d)/(tau_mu + 1/tau_d + 1/tau_y)
+  mut.hat[1] = kt[1]*yt[1] + (1-kt[1])*(mu0 + st[1])
+  var.hat[1] = (1-kt[1])*(tau_mu + 1/tau_d)
+  
+  for(i in 2:n){
+    kt[i] <- (var.hat[i-1] + 1/tau_d)/(var.hat[i-1] + 1/tau_d + 1/tau_y)
+    mut.hat[i] = kt[i]*yt[i] + (1-kt[i])*(mut.hat[i-1] + st[i])
+    var.hat[i] = (1-kt[i])*(var.hat[i-1] + 1/tau_d)
+  }
+  return(mut.hat)
+}
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
-
-  st <- rep(c(1,2,0,-3, -1, 0, 4), rep(10,7))
-  dt <- st + rnorm(length(st))
-  mut = rep(0, length(st))
-  mut[1] = dt[1]
-  for(i in 2:length(st)) mut[i] =  mut[i-1] + dt[i]
-  yt = rnorm(length(st), mean=mut, sd=10)
-  ene = length(yt)
-  aux <- range(yt, mut)
-  kt = rep(0, ene); mut.hat = rep(0, ene); var.hat = rep(0, ene)
   
-  Mu_t <- function(mu0, tau_mu, tau_d, tau_y)
-  {
-    kt = rep(0, ene); mut.hat = rep(0, ene); var.hat = rep(0, ene)
+  generate1 <- eventReactive(input$run1, {
+    st <- rnorm(input$n, input$mu_st, input$tau_st)
     
-    # primeira iteracao
-    kt[1] <- (tau_mu + 1/tau_d)/(tau_mu + 1/tau_d + 1/tau_y)
-    mut.hat[1] = kt[1]*yt[1] + (1-kt[1])*(mu0 + st[1])
-    var.hat[1] = (1-kt[1])*(tau_mu + 1/tau_d)
-    
-    for(i in 2:ene){
-      kt[i] <- (var.hat[i-1] + 1/tau_d)/(var.hat[i-1] + 1/tau_d + 1/tau_y)
-      mut.hat[i] = kt[i]*yt[i] + (1-kt[i])*(mut.hat[i-1] + st[i])
-      var.hat[i] = (1-kt[i])*(var.hat[i-1] + 1/tau_d)
-    }
-    return(mut.hat)
-  }
-  
-  Mu_Plot <- reactive({
-    Mu_t(input$m0, input$tau_mu, input$tau_d, input$tau_y)
+    dt <- st + rnorm(length(st))
+    out <- list(st = st, dt = dt)
+    return(out)
   })
   
-  output$distPlot <- renderPlot({ 
-    plot(1:ene, mut, type="l", ylim=aux, xlab="tempo", ylab="")
-    points(1:ene, yt, col="red")
-    lines(1:ene, Mu_Plot(), col="blue")
+  
+  mut = reactive({
+    mut <- rep(0, input$n)
+    dados_sim <- generate1()
+    dt <- dados_sim$dt
+    mut[1] = dt[1]
+    for(i in 2:input$n) {
+      mut[i] =  mut[i-1] + dt[i]
+    }
+    return(mut)
+  })
+  
+  generate2 <- eventReactive(input$run2, {
+    yt <- rnorm(input$n, mean = mut(), sd = (1/input$tau_y))
+    return(yt)
+  })
+  
+  Mu_Plot <- reactive({
+    St <- generate1()
+    Mu_t_hat(input$m0, input$tau_mu, 1, input$tau_y, input$n, generate2(), St$st)
+  })
+  
+  output$distPlot <- highcharter::renderHighchart({ 
+    
+    hc <- highchart() %>% 
+      hc_xAxis(1:length(yt)) %>% 
+      hc_add_series(name = "Y_t", data = generate2(), type = "scatter") %>% 
+      hc_add_series(name = "mu_t", data = mut()) %>% 
+      hc_add_series(name = "mu_t_hat",
+                    data = Mu_Plot()) %>%
+      hc_tooltip(crosshairs = TRUE, backgroundColor = "#FCFFC5",
+                 shared = TRUE, borderWidth = 5) %>% 
+      hc_exporting(enabled = TRUE)
+    # 
+    # plot(1:length(generate2()), mut(), type="l", ylim = range(c(generate2(), mut(), Mu_Plot())), xlab="tempo", ylab="")
+    # points(1:length(generate2()), generate2(), col="red")
+    # lines(1:length(generate2()), Mu_Plot(), col="blue")
+    
   })
   
 })
